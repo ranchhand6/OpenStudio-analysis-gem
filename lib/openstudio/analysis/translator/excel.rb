@@ -126,45 +126,36 @@ module OpenStudio
           @other_files = []
         end
         
-        def add_other_files(other_file)
+        def add_other_file(other_file)
           @other_files << other_file
         end
         
-        def add_variable(hash)
-          @variables << {
-            type: hash["arguement_type"],
-            parameter_display_name: hash["parameter_display_name"],
-            parameter_measure_name: hash["parameter_measure_name"],
-            parameter_short_name: hash["parameter_short_name"],
-            variable_type: hash["variable_type"],
-            units: hash["units"],
-            static_value: hash["static_value"],
-            enumeration: hash["enumeration"],
-            min: hash["min"],
-            max: hash["max"],
-            mean: hash["mean"],
-            std_dev: hash["std_dev"],
-            delta_x: hash["delta_x"],
-            distribution: hash["distribution"],
-            data_source: hash["data_source"],
-            notes: hash["notes"]
-          }
+        def set_variables(variable)
+          @variables = variable
         end
 
-        def add_measure_path(measure_path)
-          @measure_paths << measure_path
+        def delete_measure_paths
+          @measure_paths = []
+        end
+        
+        def add_measure_path(tmp_filepath)
+          if (Pathname.new tmp_filepath).absolute?
+            @measure_paths << tmp_filepath
+          else
+            @measure_paths << File.expand_path(File.join(@root_path, tmp_filepath))
+          end
         end
         
         def set_number_of_samples(number_of_samples)
           @number_of_samples = number_of_samples
         end
         
-        def add_problem(problem)
+        def set_problem(problem)
           @problem = problem
         end
         
-        def add_algorithm(algorithm)
-          @algorithm << algorighm
+        def set_algorithm(algorithm)
+          @algorithm = algorithm
         end
         
         def delete_template_json
@@ -174,21 +165,26 @@ module OpenStudio
         def set_teplate_json(template_json)
           @template_json = template_json
         end
-        
-        def delete_outputs
-          @outputs = {}
-        end
 
-        def add_output(output)
+        def set_outputs(output)
           @outputs = output
         end
-                
-        def delete_run_setup
-          @run_setup = {}
-        end
 
-        def set_run_setup
-          @run_setup = {}
+        def set_run_setup(setup)
+          @run_setup = setup
+          
+          if @run_setup['measure_directory']
+            add_measure_path(@run_setup['measure_directory'])
+          end
+          
+          if @run_setup['export_directory']
+            tmp_filepath = @run_setup['export_directory']
+            if (Pathname.new tmp_filepath).absolute?
+              @export_path = tmp_filepath
+            else
+              @export_path = File.expand_path(File.join(@root_path, tmp_filepath))
+            end
+          end
         end        
         
         def delete_aws_tags
@@ -196,7 +192,7 @@ module OpenStudio
         end
         
         def add_aws_tag(aws_tag)
-          @aws_tag << aws_tag
+          @aws_tags << aws_tag
         end
           
         # Save off the legacy format of the JSON file

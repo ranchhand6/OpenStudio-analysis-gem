@@ -573,5 +573,152 @@ describe OpenStudio::Analysis::Translator::Excel do
       expect(@excel.weather_files).to eq([])      
     end
     
+    it 'should accept and delete other files' do
+      @other_file_1 = 'this is otherfile 1.rb'
+      @other_file_2 = 'this is otherfile 2.rb'
+      
+      @excel.add_other_file(@other_file_1)
+      expect(@excel.other_files).to eq([@other_file_1])
+      
+      @excel.add_other_file(@other_file_2)
+      expect(@excel.other_files).to eq([@other_file_1, @other_file_2])
+      
+      @excel.delete_other_files
+      expect(@excel.other_files).to eq([])      
+    end
+    
+    it 'should accept and delete variables' do
+      # make this fairly correct because we'll need it for later tests
+      data = {}
+      data['data'] = []
+      # measure
+      data['data'][1] = {}
+      data['data'][1]['display_name'] = "measure_name"
+      data['data'][1]['name'] = "measure_name"
+      data['data'][1]['enabled'] = true
+      data['data'][1]['measure_file_name'] = "MeasureFileName"
+      data['data'][1]['measure_file_name_directory'] = "MeasureFileNameDirectory"
+      data['data'][1]['measure_type'] = "" # arguement or variable
+      data['data'][1]['version'] = '0.3.6'
+      data['data'][1]['variables'] = []
+      
+      # variables
+      var = {}
+      var['variable_type'] = 'arguement'
+      var['display_name'] = 'Apply the Measure to a Specific Space Type or to the Entire Model.'
+      var['display_name_short'] = 'Specific or Entire?'
+      var['name'] = 'space_type'
+      var['index'] = 1
+      var['type'] = 'choice'
+      var['units'] = ''
+      var['distribution'] = {}
+      var['distribution']['enumerations'] = "*Entire Building*"
+      var['notes'] = "This is a note"
+      var['relation_to_eui'] = ''
+      
+      data['data'][1]['variables'] << var
+
+      @excel.set_variables(data)
+      expect(@excel.variables).to eq(data)
+    end
+    
+    it 'should accept and delete measure paths' do
+      @measure_path_1 = '/path/to/1st'
+      @measure_path_2 = '/path/to/2nd'
+      
+      @excel.add_measure_path(@measure_path_1)
+      expect(@excel.measure_paths).to eq([@measure_path_1])
+      
+      @excel.add_measure_path(@measure_path_2)
+      expect(@excel.measure_paths).to eq([@measure_path_1, @measure_path_2])
+      
+      @excel.delete_measure_paths
+      expect(@excel.measure_paths).to eq([])      
+    end
+    
+    it 'should accept number_of_samples' do
+      @excel.set_number_of_samples(1)
+      expect(@excel.number_of_samples).to eq(1)
+    end
+    
+    it 'should accept a problem' do
+      problem = {}
+      problem['analysis_type'] = 'batch_run'
+      @excel.set_problem(problem)
+      expect(@excel.problem).to eq(problem)
+    end
+    
+    it 'should accept algorithms' do
+      algorithm = {}
+      algorithm['number_of_samples'] = 1
+      algorithm['generations'] = 1
+      algorithm['xover_distldx'] = 2
+      algorithm['mu_distldx'] = 2
+      algorithm['mprob'] = 0.8
+      algorithm['norm_type'] = 'kminkowski'
+      algorithm['p_power'] = 2
+      
+      @excel.set_algorithm(algorithm)
+      expect(@excel.algorithm).to eq(algorithm)     
+    end
+    
+    it 'should accept output variables' do
+      data = {}
+      data['output_variables'] = []
+      
+      var = {}
+      var['display_name'] = "Total Natural Gas Intensity"
+      var['display_name_short'] = "NG EUI"
+      var['metadata_id'] = 'total_natural_gas_intensity'
+      var['name'] = 'standard_report_legacy.total_natural_gas'
+      var['units'] = 'MJ/m2'
+      var['visualize'] = 'true'
+      var['export'] = 'true'
+      var['variable_type'] = 'double'
+      var['objective_function'] = 'true'
+      var['objective_function_index'] = 1
+      var['objective_function_target'] = 140
+      var['scaling_factor'] = 0.0
+      var['objective_function_group'] = 1
+      
+      data['output_variables'] << var
+      
+      @excel.set_outputs(data)
+      expect(@excel.outputs).to eq(data)  
+    end
+    
+    it 'should accept a run_setup' do
+      run_setup = {}
+      run_setup['analysis_name'] = 'NSGA Template'
+      run_setup['measure_directory'] = '../measures2'
+      run_setup['export_directory'] = '../analysis'
+      run_setup['allow_multiple_jobs'] = 'true'
+      run_setup['user_server_as_worker'] = 'true'
+      run_setup['simulate_data_point_filename'] = 'simulate_data_point.rb'
+      run_setup['run_data_point_filename'] = 'run_openstudio_workflow_monthly.rb'
+      
+      @excel.set_run_setup(run_setup)
+      expect(@excel.run_setup).to eq(run_setup)
+
+      expect(@excel.measure_paths[0]).to include('/measures2')
+      expect(@excel.export_path).to include('/analysis')
+    end
+    
+    it 'should accept and delet aws_tags' do
+      # clear from previous test because of :before_all
+      @excel.delete_aws_tags
+       
+      @aws_tag_1 = 'tag1'
+      @aws_tag_2 = 'tag2'
+    
+      @excel.add_aws_tag(@aws_tag_1)
+      expect(@excel.aws_tags).to eq([@aws_tag_1])
+    
+      @excel.add_aws_tag(@aws_tag_2)
+      expect(@excel.aws_tags).to eq([@aws_tag_1, @aws_tag_2])
+    
+      @excel.delete_aws_tags
+      expect(@excel.aws_tags).to eq([])      
+    end
   end
 end
