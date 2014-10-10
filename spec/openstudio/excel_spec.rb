@@ -493,4 +493,85 @@ describe OpenStudio::Analysis::Translator::Excel do
       expect(@excel.aws_tags).to eq(['org=5500','nothing=else matters'])
     end
   end
+  
+  context 'when adding work through accessors rather than the spreadsheet' do
+    before :all do
+      @excel = OpenStudio::Analysis::Translator::Excel.new('spec/files/0_3_5_multiple_measure_paths.xlsx')
+    end
+    
+    it 'should have nothing loaded immediately after initialization' do
+      expect(@excel.version).to eq('0.0.1')
+      expect(@excel.name).to eq(nil)
+      expect(@excel.analysis_name).to eq(nil)
+      expect(@excel.cluster_name).to eq(nil)
+      expect(@excel.settings).to eq({})
+      expect(@excel.weather_files).to eq([])
+      expect(@excel.models).to eq([])
+      expect(@excel.other_files).to eq([])
+      expect(@excel.export_path).to eq('./export')
+      expect(@excel.measure_paths).to eq([])
+      expect(@excel.number_of_samples).to eq(0)
+      expect(@excel.problem).to eq({})
+      expect(@excel.algorithm).to eq({})
+      expect(@excel.template_json).to eq(nil)
+      expect(@excel.outputs).to eq({})
+      expect(@excel.run_setup).to eq({})
+      expect(@excel.aws_tags).to eq([])
+    end
+    
+    it 'should accept a version' do
+      @excel.set_version('0.3.6')
+      expect(@excel.version).to eq('0.3.6')
+    end
+    
+    it 'should accept a name' do
+      @excel.set_name('test name')
+      expect(@excel.name).to eq('test name')
+    end
+    
+    it 'should accept an analysis_name' do
+      @excel.set_analysis_name('NSGA Template')
+      expect(@excel.analysis_name).to eq('NSGA Template')
+    end
+    
+    it 'should accept a cluster_name' do
+      @excel.set_cluster_name('cluster_name')
+      expect(@excel.cluster_name).to eq('cluster_name')
+    end
+
+    it 'should accept settings' do
+      @settings = {
+        spreadsheet_version: '0.3.6', 
+        user_id: "ebr-test",
+        open_studio_server_version: "1.8.0-pre12",
+        cluster_name: "Default Cluster",
+        server_instance_type: "mx.2xlarge",
+        worker_instance_type: "c3.8xlarge",
+        worker_nodes: 1,
+        aws_tags: ["org=5500", "nothing=else matters"],
+        proxy_port: "222"
+        }
+      @excel.add_settings(@settings)
+      expect(@excel.settings).to eq(@settings)
+      expect(@excel.version).to eq('0.3.6')
+      expect(@excel.aws_tags).to eq(["org=5500", "nothing=else matters"])
+      expect(@excel.cluster_name).to eq("default_cluster")
+      expect(@excel.settings[:proxy_port]).to eq(222) # <= to_i conversion
+    end    
+    
+    it 'should accept and delete weather files' do
+      @weather_file_1 = 'this is the first.tmy3'
+      @weather_file_2 = 'this is the second.tmy2'
+      
+      @excel.add_weather_file(@weather_file_1)
+      expect(@excel.weather_files).to eq([@weather_file_1])
+      
+      @excel.add_weather_file(@weather_file_2)
+      expect(@excel.weather_files).to eq([@weather_file_1, @weather_file_2])
+      
+      @excel.delete_weather_files
+      expect(@excel.weather_files).to eq([])      
+    end
+    
+  end
 end

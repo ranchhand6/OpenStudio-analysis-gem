@@ -16,6 +16,8 @@ module OpenStudio
         attr_reader :problem
         attr_reader :run_setup
         attr_reader :aws_tags
+        attr_reader :other_files
+        attr_reader :number_of_samples
 
         # remove these once we have classes to construct the JSON file
         attr_accessor :name
@@ -85,7 +87,118 @@ module OpenStudio
             path: path
           }
         end
+        
+        def set_version(version)
+          @version = version
+        end
+        
+        def set_name(name)
+          @name = name
+        end
+        
+        def set_analysis_name(analysis_name)
+          @analysis_name = analysis_name
+        end
+      
+        def set_cluster_name(cluster_name)
+          @cluster_name = cluster_name
+        end
+        
+        def add_settings(setting)
+          @settings = setting
+          @version = setting[:spreadsheet_version]
+          @cluster_name = @settings[:cluster_name].snake_case if @settings[:cluster_name]
+          @aws_tags = setting[:aws_tags]
+          
+          #typing
+          @settings[:proxy_port] = @settings[:proxy_port].to_i if @settings[:proxy_port]
+        end
+        
+        def delete_weather_files
+          @weather_files = []
+        end
+        
+        def add_weather_file(weather_file)
+          @weather_files << weather_file
+        end
+        
+        def delete_other_files
+          @other_files = []
+        end
+        
+        def add_other_files(other_file)
+          @other_files << other_file
+        end
+        
+        def add_variable(hash)
+          @variables << {
+            type: hash["arguement_type"],
+            parameter_display_name: hash["parameter_display_name"],
+            parameter_measure_name: hash["parameter_measure_name"],
+            parameter_short_name: hash["parameter_short_name"],
+            variable_type: hash["variable_type"],
+            units: hash["units"],
+            static_value: hash["static_value"],
+            enumeration: hash["enumeration"],
+            min: hash["min"],
+            max: hash["max"],
+            mean: hash["mean"],
+            std_dev: hash["std_dev"],
+            delta_x: hash["delta_x"],
+            distribution: hash["distribution"],
+            data_source: hash["data_source"],
+            notes: hash["notes"]
+          }
+        end
 
+        def add_measure_path(measure_path)
+          @measure_paths << measure_path
+        end
+        
+        def set_number_of_samples(number_of_samples)
+          @number_of_samples = number_of_samples
+        end
+        
+        def add_problem(problem)
+          @problem = problem
+        end
+        
+        def add_algorithm(algorithm)
+          @algorithm << algorighm
+        end
+        
+        def delete_template_json
+          @template_json = nil
+        end
+        
+        def set_teplate_json(template_json)
+          @template_json = template_json
+        end
+        
+        def delete_outputs
+          @outputs = {}
+        end
+
+        def add_output(output)
+          @outputs = output
+        end
+                
+        def delete_run_setup
+          @run_setup = {}
+        end
+
+        def set_run_setup
+          @run_setup = {}
+        end        
+        
+        def delete_aws_tags
+          @aws_tags = []
+        end
+        
+        def add_aws_tag(aws_tag)
+          @aws_tag << aws_tag
+        end
+          
         # Save off the legacy format of the JSON file
         def save_variable_json(filename)
           FileUtils.rm_f(filename) if File.exist?(filename)

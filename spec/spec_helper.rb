@@ -3,6 +3,9 @@ $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
 
 require 'openstudio-analysis'
 require 'rspec'
+require 'open-uri'
+require 'pry'
+require 'pry-nav'
 
 RSpec.configure do |config|
   # Use color in STDOUT
