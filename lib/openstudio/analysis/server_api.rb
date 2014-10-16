@@ -522,6 +522,20 @@ module OpenStudio
           fail 'Could not start the analysis'
         end
       end
+      
+      def run_analysis_with_response(analysis_id, options)
+        defaults = { analysis_action: 'start', without_delay: false }
+        options = defaults.merge(options)
+
+        puts "Run analysis is configured with #{options.to_json}"
+        response = @conn.post do |req|
+          req.url "analyses/#{analysis_id}/action.json"
+          req.headers['Content-Type'] = 'application/json'
+          req.body = options.to_json
+          req.options[:timeout] = 1800 # seconds
+        end
+        response
+      end
 
       def kill_analysis(analysis_id)
         analysis_action = { analysis_action: 'stop' }
