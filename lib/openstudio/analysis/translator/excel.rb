@@ -458,9 +458,9 @@ module OpenStudio
         # Package up the seed, weather files, and measures
         def save_analysis_zip(model)
           def add_directory_to_zip(zipfile, local_directory, relative_zip_directory)
-            # pp "Add Directory #{local_directory}"
+            # puts "Add Directory #{local_directory}"
             Dir[File.join("#{local_directory}", '**', '**')].each do |file|
-              # pp "Adding File #{file}"
+              # puts "Adding File #{file}"
               zipfile.add(file.sub(local_directory, relative_zip_directory), file)
             end
             zipfile
@@ -517,10 +517,10 @@ module OpenStudio
                   if File.basename(file) == 'resources' || File.basename(file) == 'lib'
                     add_directory_to_zip(zipfile, file, "./measures/#{measure[:name]}/#{File.basename(file)}")
                   else
-                    # pp "Skipping Directory #{File.basename(file)}"
+                    # puts "Skipping Directory #{File.basename(file)}"
                   end
                 else
-                  # pp "Adding File #{file}"
+                  # puts "Adding File #{file}"
                   # added_measures << measure_dir unless added_measures.include? measure_dir
                   zipfile.add(file.sub(measure_dir_to_add, "./measures/#{measure[:name]}/"), file)
                 end
@@ -670,7 +670,7 @@ module OpenStudio
                 if row[1]
                   @name = row[1]
                 else
-                  @name = UUID.new.generate
+                  @name = SecureRandom.uuid
                 end
                 @analysis_name = @name.snake_case
               end
@@ -720,7 +720,7 @@ module OpenStudio
               if row[1]
                 tmp_m_name = row[1]
               else
-                tmp_m_name = UUID.new.generate
+                tmp_m_name = SecureRandom.uuid
               end
               # Only add models if the row is flagged
               if row[0] && row[0].downcase == 'model'
