@@ -9,6 +9,8 @@ module OpenStudio
         attr_reader :models
         attr_reader :weather_files
         attr_reader :measure_paths
+        attr_reader :worker_inits
+        attr_reader :worker_finals
         attr_reader :export_path
         attr_reader :cluster_name
         attr_reader :variables
@@ -48,6 +50,8 @@ module OpenStudio
           @weather_files = []
           @models = []
           @other_files = []
+          @worker_inits = []
+          @worker_finals = []
           @export_path = './export'
           @measure_paths = []
           @number_of_samples = 0 # todo: remove this
@@ -207,7 +211,6 @@ module OpenStudio
             fail "Measures directory '#{mp}' does not exist" unless Dir.exist?(mp)
           end
 
-
           @models.uniq!
           fail 'No seed models defined in spreadsheet' if @models.empty?
 
@@ -223,11 +226,27 @@ module OpenStudio
           end
 
           # This can be a directory as well
-          @other_files.each do |of|
-            fail "Other files do not exist for: #{of[:path]}" unless File.exist?(of[:path])
+          @other_files.each do |f|
+            fail "Other files do not exist for: #{f[:path]}" unless File.exist?(f[:path])
+          end
+
+          @worker_inits.each do |f|
+            fail "Worker initialization file does not exist for: #{f[:path]}" unless File.exist?(f[:path])
+          end
+
+          @worker_finals.each do |f|
+            fail "Worker finalization file does not exist for: #{f[:path]}" unless File.exist?(f[:path])
           end
 
           FileUtils.mkdir_p(@export_path)
+
+          # verify that the measure display names are unique
+          #puts @variables.inspect
+          measure_display_names = @variables['data'].map{ |m| m['enabled'] ? m['display_name'] : nil}.compact
+          measure_display_names_mult = measure_display_names.select{ |m| measure_display_names.count(m) > 1 }.uniq
+          if measure_display_names_mult && !measure_display_names_mult.empty?
+            fail "Measure Display Names are not unique for '#{measure_display_names_mult.join('\', \'')}'"
+          end
 
           # verify that all continuous variables have all the data needed and create a name maps
           variable_names = []
@@ -480,7 +499,7 @@ module OpenStudio
 
             # Convert this into a hash which looks like {name: measure_name}. This will allow us to add more
             # fields to the measure, such as which directory is the measure.
-            required_measures = required_measures.map { |value| {name: value} }
+            required_measures = required_measures.map { |value| { name: value } }
 
             # first validate that all the measures exist
             errors = []
@@ -536,6 +555,34 @@ module OpenStudio
                 zipfile.add(file.sub(others[:path], "./lib/#{others[:lib_zip_name]}/"), file)
               end
             end
+
+            # puts "Adding in Worker initialize scripts #{@worker_inits}"
+            @worker_inits.each_with_index do |f, index|
+              # this is ordered
+              f[:ordered_file_name] = "#{index.to_s.rjust(2, '0')}_#{File.basename(f[:path])}"
+              f[:index] = index
+
+              zipfile.add(f[:path].sub(f[:path], "./lib/worker_initialize/#{f[:ordered_file_name]}"), f[:path])
+              arg_file = "#{File.basename(f[:ordered_file_name], '.*')}.args"
+              file = Tempfile.new('arg')
+              file.write(f[:args])
+              zipfile.add("./lib/worker_initialize/#{arg_file}", file)
+              file.close
+            end
+
+            # puts "Adding in Worker finalize scripts #{@worker_finals}"
+            @worker_finals.each_with_index do |f, index|
+              # this is ordered
+              f[:ordered_file_name] = "#{index.to_s.rjust(2, '0')}_#{File.basename(f[:path])}"
+              f[:index] = index
+
+              zipfile.add(f[:path].sub(f[:path], "./lib/worker_finalize/#{f[:ordered_file_name]}"), f[:path])
+              arg_file = "#{File.basename(f[:ordered_file_name], '.*')}.args"
+              file = Tempfile.new('arg')
+              file.write(f[:args])
+              zipfile.add("./lib/worker_finalize/#{arg_file}", file)
+              file.close
+            end
           end
         end
 
@@ -583,6 +630,8 @@ module OpenStudio
           b_weather_files = false
           b_models = false
           b_other_libs = false
+          b_worker_init = false
+          b_worker_final = false
 
           rows.each do |row|
             if row[0] == 'Settings'
@@ -593,6 +642,8 @@ module OpenStudio
               b_weather_files = false
               b_models = false
               b_other_libs = false
+              b_worker_init = false
+              b_worker_final = false
               next
             elsif row[0] == 'Running Setup'
               b_settings = false
@@ -602,6 +653,8 @@ module OpenStudio
               b_weather_files = false
               b_models = false
               b_other_libs = false
+              b_worker_init = false
+              b_worker_final = false
               next
             elsif row[0] == 'Problem Definition'
               b_settings = false
@@ -611,6 +664,8 @@ module OpenStudio
               b_weather_files = false
               b_models = false
               b_other_libs = false
+              b_worker_init = false
+              b_worker_final = false
               next
             elsif row[0] == 'Algorithm Setup'
               b_settings = false
@@ -620,6 +675,8 @@ module OpenStudio
               b_weather_files = false
               b_models = false
               b_other_libs = false
+              b_worker_init = false
+              b_worker_final = false
               next
             elsif row[0] == 'Weather Files'
               b_settings = false
@@ -629,6 +686,8 @@ module OpenStudio
               b_weather_files = true
               b_models = false
               b_other_libs = false
+              b_worker_init = false
+              b_worker_final = false
               next
             elsif row[0] == 'Models'
               b_settings = false
@@ -638,6 +697,8 @@ module OpenStudio
               b_weather_files = false
               b_models = true
               b_other_libs = false
+              b_worker_init = false
+              b_worker_final = false
               next
             elsif row[0] == 'Other Library Files'
               b_settings = false
@@ -647,6 +708,30 @@ module OpenStudio
               b_weather_files = false
               b_models = false
               b_other_libs = true
+              b_worker_init = false
+              b_worker_final = false
+              next
+            elsif row[0] =~ /Worker Initialization Scripts/
+              b_settings = false
+              b_run_setup = false
+              b_problem_setup = false
+              b_algorithm_setup = false
+              b_weather_files = false
+              b_models = false
+              b_other_libs = false
+              b_worker_init = true
+              b_worker_final = false
+              next
+            elsif row[0] =~ /Worker Finalization Scripts/
+              b_settings = false
+              b_run_setup = false
+              b_problem_setup = false
+              b_algorithm_setup = false
+              b_weather_files = false
+              b_models = false
+              b_other_libs = false
+              b_worker_init = false
+              b_worker_final = true
               next
             end
 
@@ -663,7 +748,6 @@ module OpenStudio
 
               # type some of the values that we know
               @settings['proxy_port'] = @settings['proxy_port'].to_i if @settings['proxy_port']
-
 
             elsif b_run_setup
               if row[0] == 'Analysis Name'
@@ -738,7 +822,23 @@ module OpenStudio
               end
 
               @other_files << { lib_zip_name: row[1], path: other_path }
+            elsif b_worker_init
+              worker_init_path = row[1]
+              unless (Pathname.new worker_init_path).absolute?
+                worker_init_path = File.expand_path(File.join(@root_path, worker_init_path))
+              end
+
+              @worker_inits << { name: row[0], path: worker_init_path, args: row[2] }
+            elsif b_worker_final
+              worker_final_path = row[1]
+              unless (Pathname.new worker_final_path).absolute?
+                worker_final_path = File.expand_path(File.join(@root_path, worker_final_path))
+              end
+
+              @worker_finals << { name: row[0], path: worker_final_path, args: row[2] }
             end
+
+            next
           end
 
           # do some last checks
@@ -748,7 +848,7 @@ module OpenStudio
         # parse_variables will parse the XLS spreadsheet and save the data into
         # a higher level JSON file.  The JSON file is historic and it should really
         # be omitted as an intermediate step
-        def   parse_variables
+        def parse_variables
           # clean remove whitespace and unicode chars
           # The parse is a unique format (https://github.com/Empact/roo/blob/master/lib/roo/base.rb#L444)
           # If you add a new column and you want that variable in the hash, then you must add it here.
@@ -927,7 +1027,7 @@ module OpenStudio
 
                 # parse the choices/enums
                 if var['type'] == 'enum' || var['type'] == 'choice' # this is now a choice
-                  var['distribution']['enumerations'] = row[:enums].gsub('|', '').split(',').map { |v| v.strip }
+                  var['distribution']['enumerations'] = row[:enums].gsub('|', '').split(',').map(&:strip)
                 elsif var['type'] == 'bool'
                   var['distribution']['enumerations'] = []
                   var['distribution']['enumerations'] << 'true' # TODO: should this be a real bool?
@@ -957,7 +1057,7 @@ module OpenStudio
               # generate name id
               # TODO: put this into a logger. puts "Parsing measure #{row[1]}"
               display_name = row[:measure_name_or_var_type]
-              measure_name = display_name.downcase.strip.gsub('-', '_').gsub(' ', '_')
+              measure_name = display_name.downcase.strip.gsub('-', '_').gsub(' ', '_').gsub('__','_')
               data['data'][measure_index]['display_name'] = display_name
               data['data'][measure_index]['name'] = measure_name
               data['data'][measure_index]['enabled'] = row[:enabled] == 'TRUE' ? true : false
