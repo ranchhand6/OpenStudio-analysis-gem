@@ -492,6 +492,16 @@ module OpenStudio
             @weather_files.each do |filename|
               # puts "  Adding #{filename}"
               zipfile.add("./weather/#{File.basename(filename)}", filename)
+              # add stat and ddy files too, if they exist
+              binding.pry
+              path_to_weather = File.split(filename)[0]
+              weatherfile_basename = File.basename(filename, ".epw")
+              if File.file?("#{path_to_weather}/#{weatherfile_basename}.ddy")
+                zipfile.add("./weather/#{weatherfile_basename}.ddy", "#{path_to_weather}/#{weatherfile_basename}.ddy")
+              end
+              if File.file?("#{path_to_weather}/#{weatherfile_basename}.stat")
+                zipfile.add("./weather/#{weatherfile_basename}.stat", "#{path_to_weather}/#{weatherfile_basename}.stat")
+              end
             end
 
             # Add only the measures that are defined in the spreadsheet
