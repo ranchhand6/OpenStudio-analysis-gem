@@ -493,7 +493,7 @@ module OpenStudio
               # puts "  Adding #{filename}"
               zipfile.add("./weather/#{File.basename(filename)}", filename)
               # add stat and ddy files too, if they exist
-              binding.pry
+              #get_binding.pry
               path_to_weather = File.split(filename)[0]
               weatherfile_basename = File.basename(filename, ".epw")
               if File.file?("#{path_to_weather}/#{weatherfile_basename}.ddy")
