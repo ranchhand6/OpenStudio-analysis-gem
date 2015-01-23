@@ -1,10 +1,31 @@
 OpenStudio Analysis Gem Change Log
 ==================================
 
-Version 0.3.7 (Unreleased)
+Unreleased Version
+------------------
+* Add defaults to the OpenStudio::Analysis::ServerApi .run method.
+* Bug fix for path to the measure if there was more than one depth of the directory.
+* Add measure_definition_directory_local to store where the path to the original measure.
+* run_analysis will be deprecated in 0.5.0. Use start_analysis instead of run_analysis.
+
+Version 0.4.2
 -------------
-* Worker initilization and finalization scripts
-* Do not allow the file to proccess if the Measure Display Names are not unique
+* Bug fix when adding measure from path, this now sets the correct argument name.
+* Fix namespace conflict with OpenStudio::Logger and OpenStudio::Time
+* Create method for saving the Analysis Zip file (save_analysis_zip)
+
+Version 0.4.1
+-------------
+* Bug fix to address the spec/files directory being prepended to the measures
+
+Version 0.4.0
+-------------
+* Add programmatic interface. This is now used when translating the Excel file into the JSON.
+
+Version 0.3.7
+-------------
+* Worker initialization and finalization scripts
+* Do not allow the file to process if the Measure Display Names are not unique
 
 Version 0.3.6
 -------------
@@ -96,7 +117,7 @@ Version 0.1.7
 Version 0.1.6
 -------------
 * Small fixes
-                
+
 Version 0.1.5
 -------------
 * Now depends on json_pure for window users
@@ -119,5 +140,3 @@ Version 0.1.1
 * Convert argument values to the right variable types
 
 * Add measure type parsing by reading the inherited class
-
-

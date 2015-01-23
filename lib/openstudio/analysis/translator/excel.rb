@@ -241,19 +241,18 @@ module OpenStudio
           FileUtils.mkdir_p(@export_path)
 
           # verify that the measure display names are unique
-          #puts @variables.inspect
-          measure_display_names = @variables['data'].map{ |m| m['enabled'] ? m['display_name'] : nil}.compact
-          measure_display_names_mult = measure_display_names.select{ |m| measure_display_names.count(m) > 1 }.uniq
+          # puts @variables.inspect
+          measure_display_names = @variables['data'].map { |m| m['enabled'] ? m['display_name'] : nil }.compact
+          measure_display_names_mult = measure_display_names.select { |m| measure_display_names.count(m) > 1 }.uniq
           if measure_display_names_mult && !measure_display_names_mult.empty?
             fail "Measure Display Names are not unique for '#{measure_display_names_mult.join('\', \'')}'"
           end
 
-          # verify that all continuous variables have all the data needed and create a name maps
+          # verify that all continuous variables have all the data needed and create a name map
           variable_names = []
           @variables['data'].each do |measure|
             if measure['enabled']
               measure['variables'].each do |variable|
-
                 # Determine if row is suppose to be an argument or a variable to be perturbed.
                 if variable['variable_type'] == 'variable'
                   variable_names << variable['display_name']
@@ -288,7 +287,7 @@ module OpenStudio
                     if variable['distribution']['max'].nil? || variable['distribution']['max'] == ''
                       fail "Variable #{measure['name']}:#{variable['name']} must have a maximum"
                     end
-                    unless variable['type'] == 'string'
+                    unless variable['type'] == 'string' || variable['type'] =~ /bool/
                       if variable['distribution']['min'] > variable['distribution']['max']
                         fail "Variable min is greater than variable max for #{measure['name']}:#{variable['name']}"
                       end
@@ -314,6 +313,9 @@ module OpenStudio
           # the correct weather files or models
           @template_json = translate_to_analysis_json_template
 
+          # save the other format for now
+          translate_to_analysis
+
           @template_json
         end
 
@@ -332,7 +334,31 @@ module OpenStudio
           end
         end
 
-        # TODO: move this into a new class that helps construct this file
+        # New method that uses the objects to hold the analysis
+        def translate_to_analysis
+          # Use the programmatic interface to make the analysis json now
+          analysis = OpenStudio::Analysis.create(@analysis_name)
+
+          @variables['data'].each do |measure|
+            next unless measure['enabled']
+
+            # TODO: make this read the measure.rb file, then override any of the differences. That is call workflow.add_from_measure_path
+            analysis.workflow.add_measure_from_excel(measure)
+          end
+
+          # Add in the outputs
+
+          @outputs['output_variables'].each do |o|
+            o = Hash[o.map { |k, v| [k.to_sym, v] }]
+            analysis.add_output(o)
+          end
+
+          # Temp save of the json file
+          # analysis.save("#{analysis.display_name}_api.json")
+
+          analysis
+        end
+
         def translate_to_analysis_json_template
           # Load in the templates for constructing the JSON file
           template_root = File.join(File.dirname(__FILE__), '../../templates')
@@ -376,21 +402,10 @@ module OpenStudio
 
                   # add this as an argument
                   case @variable['type'].downcase
-                    when 'double'
-                      @static_value = @variable['distribution']['static_value'].to_f
-                    when 'integer'
-                      @static_value = @variable['distribution']['static_value'].to_i
-                    # TODO: update openstudio export to write only Strings
                     when 'string', 'choice'
                       @static_value = @variable['distribution']['static_value'].inspect
-                    when 'bool'
-                      if @variable['distribution']['static_value'].downcase == 'true'
-                        @static_value = true
-                      else
-                        @static_value = false
-                      end
                     else
-                      fail "Unknown variable type of '#{@variable['type']}'"
+                      @static_value = @variable['distribution']['static_value']
                   end
                   ag = JSON.parse(argument_template.result(get_binding))
                   fail "Argument '#{@variable['name']}' did not process.  Most likely it did not have all parameters defined." if ag.nil?
@@ -399,21 +414,10 @@ module OpenStudio
                   vr = nil
                   # add this as an argument
                   case @variable['type'].downcase
-                    when 'double'
-                      @static_value = @variable['distribution']['static_value'].to_f
-                    when 'integer'
-                      @static_value = @variable['distribution']['static_value'].to_i
-                    # TODO: update openstudio export to write only Strings
                     when 'string', 'choice'
                       @static_value = @variable['distribution']['static_value'].inspect
-                    when 'bool'
-                      if @variable['distribution']['static_value'].downcase == 'true'
-                        @static_value = true
-                      else
-                        @static_value = false
-                      end
                     else
-                      fail "Unknown variable type of '#{@variable['type']}'"
+                      @static_value = @variable['distribution']['static_value']
                   end
 
                   # TODO: remove enum and choice as this is not the variable type
@@ -422,24 +426,11 @@ module OpenStudio
                     vr = JSON.parse(discrete_uncertain_variable_template.result(get_binding))
                   elsif @variable['distribution']['type'] == 'discrete_uncertain'
                     # puts @variable.inspect
-                    weights = nil
-                    if @variable['distribution']['discrete_weights'] && @variable['distribution']['discrete_weights'] != ''
-                      weights = eval(@variable['distribution']['discrete_weights'])
-                    end
-
-                    values = nil
-                    if variable['type'].downcase == 'bool'
-                      values = eval(@variable['distribution']['discrete_values'])
-                      values.map! { |v| v.to_s == 'true' }
+                    if @variable['distribution']['discrete_weights']
+                      fail "Discrete variable '#{@variable['name']}' does not have equal length of values and weights" if @variable['distribution']['discrete_values'].size != @variable['distribution']['discrete_weights'].size
+                      @values_and_weights = @variable['distribution']['discrete_values'].zip(@variable['distribution']['discrete_weights']).map { |v, w| { value: v, weight: w } }.to_json
                     else
-                      values = eval(@variable['distribution']['discrete_values'])
-                    end
-
-                    if weights
-                      fail "Discrete variable '#{@variable['name']}' does not have equal length of values and weights" if values.size != weights.size
-                      @values_and_weights = values.zip(weights).map { |v, w| { value: v, weight: w } }.to_json
-                    else
-                      @values_and_weights = values.map { |v| { value: v } }.to_json
+                      @values_and_weights = @variable['distribution']['discrete_values'].map { |v| { value: v } }.to_json
                     end
 
                     if @variable['variable_type'] == 'pivot'
@@ -1022,7 +1013,7 @@ module OpenStudio
 
             # check if we are a measure - nil means that the cell was blank
             if row[:enabled].nil?
-              unless measure_name.nil?
+              if measure_name && data['data'][measure_index]['enabled']
                 variable_index += 1
 
                 var = {}
@@ -1031,7 +1022,7 @@ module OpenStudio
                 var['display_name_short'] = row[:display_name_short] ? row[:display_name_short] : var['display_name']
                 var['name'] = row[:measure_type_or_parameter_name_in_measure]
                 var['index'] = variable_index # order of the variable (not sure of its need)
-                var['type'] = row[:variable_type] ? row[:variable_type].downcase : row[:variable_type]
+                var['type'] = row[:variable_type].downcase
                 var['units'] = row[:units]
                 var['distribution'] = {}
 
@@ -1052,6 +1043,32 @@ module OpenStudio
                 var['distribution']['discrete_weights'] = row[:discrete_weights]
                 var['distribution']['type'] = row[:distribution]
                 var['distribution']['static_value'] = row[:default_value]
+                var['distribution']['delta_x'] = row[:delta_x]
+
+                # type various values correctly
+                var['distribution']['min'] = typecast_value(var['type'], var['distribution']['min'])
+                var['distribution']['max'] = typecast_value(var['type'], var['distribution']['max'])
+                var['distribution']['mean'] = typecast_value(var['type'], var['distribution']['mean'])
+                var['distribution']['stddev'] = typecast_value(var['type'], var['distribution']['stddev'])
+                var['distribution']['static_value'] = typecast_value(var['type'], var['distribution']['static_value'])
+
+                # eval the discrete value and weight arrays
+                case var['type']
+                  when 'bool', 'boolean'
+                    if var['distribution']['discrete_values']
+                      var['distribution']['discrete_values'] = eval(var['distribution']['discrete_values']).map { |v| v.to_s == 'true' }
+                    end
+                    if var['distribution']['discrete_weights'] && var['distribution']['discrete_weights'] != ''
+                      var['distribution']['discrete_weights'] = eval(var['distribution']['discrete_weights'])
+                    end
+                  else
+                    if var['distribution']['discrete_values']
+                      var['distribution']['discrete_values'] = eval(var['distribution']['discrete_values'])
+                    end
+                    if var['distribution']['discrete_weights'] && var['distribution']['discrete_weights'] != ''
+                      var['distribution']['discrete_weights'] = eval(var['distribution']['discrete_weights'])
+                    end
+                end
 
                 var['distribution']['source'] = row[:source]
                 var['notes'] = row[:notes]
@@ -1067,7 +1084,7 @@ module OpenStudio
               # generate name id
               # TODO: put this into a logger. puts "Parsing measure #{row[1]}"
               display_name = row[:measure_name_or_var_type]
-              measure_name = display_name.downcase.strip.gsub('-', '_').gsub(' ', '_').gsub('__','_')
+              measure_name = display_name.downcase.strip.gsub('-', '_').gsub(' ', '_').gsub('__', '_')
               data['data'][measure_index]['display_name'] = display_name
               data['data'][measure_index]['name'] = measure_name
               data['data'][measure_index]['enabled'] = row[:enabled] == 'TRUE' ? true : false
@@ -1147,7 +1164,7 @@ module OpenStudio
             var['units'] = row[:units]
             var['visualize'] = row[:visualize].downcase == 'true' ? true : false if row[:visualize]
             var['export'] = row[:export].downcase == 'true' ? true : false if row[:export]
-            var['variable_type'] = row[:variable_type] if row[:variable_type]
+            var['variable_type'] = row[:variable_type].downcase if row[:variable_type]
             var['objective_function'] = row[:objective_function].downcase == 'true' ? true : false
             if var['objective_function']
               @algorithm['objective_functions'] << var['name']

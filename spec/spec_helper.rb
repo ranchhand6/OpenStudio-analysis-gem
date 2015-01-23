@@ -1,8 +1,8 @@
 $LOAD_PATH.unshift(File.dirname(__FILE__))
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
 
-require 'openstudio-analysis'
 require 'rspec'
+require 'openstudio-analysis'
 require 'open-uri'
 require 'pry'
 require 'pry-nav'
